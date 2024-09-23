@@ -6,12 +6,11 @@ from PyPDF2 import PdfReader
 from transformers import BertTokenizer, BertModel
 from sklearn.metrics.pairwise import cosine_similarity
 
-# Step 1: Load resumes from the directory (support for PDF and DOCX)
-def load_resumes(resume_directory):
-    resumes = []
+# Step 1: Load the resume from the directory (support for PDF and DOCX)
+def load_resume(resume_directory):
     resume_files = os.listdir(resume_directory)
     
-    # Loop through all resume files
+    # Check for a valid resume file (either .pdf or .docx)
     for file in resume_files:
         file_path = os.path.join(resume_directory, file)
         if file.endswith('.pdf'):
@@ -34,7 +33,7 @@ def load_jds(jd_directory):
             jds.append(read_docx(file_path))
     return jds
 
-# Function to read text from PDF
+# Function to read text from PDF document
 def read_pdf(file_path):
     reader = PdfReader(file_path)
     text = ""
@@ -42,18 +41,20 @@ def read_pdf(file_path):
         text += page.extract_text()
     return text
 
-# Function to read text from DOCX
+# Function to read text from DOCX document
 def read_docx(file_path):
     doc = docx.Document(file_path)
     text = "\n".join([para.text for para in doc.paragraphs])
     return text
 
-# Step 3: Extract keywords from text using SpaCy
-def extract_keywords(text):
+# Step 2: Extract keywords from resume using SpaCy
+def extract_keywords(resume_text):
     nlp = spacy.load('en_core_web_sm')
-    doc = nlp(text)
+    doc = nlp(resume_text)
     keywords = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
     return keywords
+
+# Step 3: Lemmatization (SpaCy already performs this in keyword extraction)
 
 # Step 4: Generate embeddings using BERT
 def generate_bert_embeddings(keywords):
@@ -64,16 +65,11 @@ def generate_bert_embeddings(keywords):
     encoded_input = tokenizer(keywords, padding=True, truncation=True, return_tensors='pt')
     with torch.no_grad():
         output = model(**encoded_input)
-
-    # Output the last hidden states
+        
     embeddings = output.last_hidden_state.mean(dim=1)
     return embeddings
 
-# Step 5: Calculate Cosine Similarity between two sets of embeddings
-def calculate_similarity(embedding1, embedding2):
-    return cosine_similarity(embedding1, embedding2)
-
-# Main function to compare resumes and JDs
+# Main function to run the process
 def main():
     resume_directory = "./resume"  # Directory where resumes are stored
     jd_directory = "./JD"  # Directory where job descriptions are stored
