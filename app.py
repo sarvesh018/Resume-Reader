@@ -5,10 +5,15 @@ import docx
 from PyPDF2 import PdfReader
 from transformers import BertTokenizer, BertModel
 from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.preprocessing import normalize
 import numpy as np
 
-# load resume
+# Load skill sets from the skill_set.txt file (each skill on a new line)
+def load_skill_set(skill_file):
+    with open(skill_file, 'r') as f:
+        skills = f.read().splitlines()  # Read each line as a separate skill
+    return set(skill.lower() for skill in skills)  # Convert to lowercase for case-insensitive matching
+
+# Load resumes
 def load_resumes(resume_directory):
     resumes = []
     resume_files = os.listdir(resume_directory)
@@ -23,8 +28,7 @@ def load_resumes(resume_directory):
             
     return resumes
 
-
-# load JD
+# Load JDs
 def load_jds(jd_directory):
     jds = []
     jd_files = os.listdir(jd_directory)
@@ -39,7 +43,7 @@ def load_jds(jd_directory):
     
     return jds
 
-# pdf reader function
+# PDF reader function
 def read_pdf(file_path):
     reader = PdfReader(file_path)
     text = ""
@@ -47,77 +51,110 @@ def read_pdf(file_path):
         text += page.extract_text()
     return text
 
-# docx reader function
+# DOCX reader function
 def read_docx(file_path):
     doc = docx.Document(file_path)
     text = "\n".join([para.text for para in doc.paragraphs])
     return text
 
-# using spacy to extract keyword
+# Using spacy to extract keywords
 def extract_keywords(text):
     nlp = spacy.load('en_core_web_sm')
     doc = nlp(text)
     keywords = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
     return keywords
 
+# Match extracted keywords with the skill set
+def match_skills(extracted_keywords, skill_set):
+    matched_keywords = [keyword for keyword in extracted_keywords if keyword.lower() in skill_set]
+    return list(set(matched_keywords))
 
-
-# generating embeddings using BERT
+# Generating embeddings using BERT
 def generate_bert_embeddings(keywords):
+    if not keywords:
+        return None  # If no matched keywords, return None
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     model = BertModel.from_pretrained('bert-base-uncased')
 
-    # create tokens
+    # Create tokens
     encoded_input = tokenizer(keywords, padding=True, truncation=True, return_tensors='pt')
     with torch.no_grad():
         output = model(**encoded_input)
     
-    embeddings = output.last_hidden_state.mean(dim=1) # this line will generate vector from all the embbedings
+    embeddings = output.last_hidden_state.mean(dim=1)  # Generate vector from all embeddings
     return embeddings
 
-
-
-
-# using cosine similarity for comparison
+# Using cosine similarity for comparison
 def calculate_similarity(doc1, doc2):
+    if doc1 is None or doc2 is None:
+        return np.nan  # If any embedding is None, return NaN similarity
     return cosine_similarity(doc1, doc2)
-
-
-
 
 def main():
     resume_directory = "./resume"
     jd_directory = "./JD"
+    skill_file = "./skill_set.txt"  # Skill set stored in a text file
     
-    # loading resumes and job descriptions
+    # Load skill set from text file
+    skill_set = load_skill_set(skill_file)
+    print(skill_set)  # Print the loaded skills for debugging
+    
+    # Load resumes and job descriptions
     resumes = load_resumes(resume_directory)
     jds = load_jds(jd_directory)
     
     similarity_matrix = []
     
     for resume in resumes:
+        # Extract and match keywords with the skill set
         resume_keywords = extract_keywords(resume)
-        resume_embedding = generate_bert_embeddings(resume_keywords)
+        matched_resume_keywords = match_skills(resume_keywords, skill_set)
+        print("\nMatched Resume Keywords:", matched_resume_keywords)
         
-        resume_score= []
+        # Generate embeddings for matched keywords
+        resume_embedding = generate_bert_embeddings(matched_resume_keywords)
+        if resume_embedding is None:
+            print("No matching skills found in resume.")
+            continue
         
-        # comparing with each JD
+        resume_score = []
+        
+        # Compare with each JD
         for jd in jds:
+            # Extract and match keywords with the skill set
             jd_keywords = extract_keywords(jd)
-            jd_embedding = generate_bert_embeddings(jd_keywords)
+            matched_jd_keywords = match_skills(jd_keywords, skill_set)
             
+            # Generate embeddings for matched keywords
+            jd_embedding = generate_bert_embeddings(matched_jd_keywords)
+            if jd_embedding is None:
+                print("No matching skills found in JD.")
+                continue
+            
+            # Calculate similarity
             similarity_score = calculate_similarity(resume_embedding, jd_embedding)
-            print(similarity_score)
-            resume_score.append(similarity_score.flatten())  # flatten simplifies complex arrays
+            print("Similarity Score:", similarity_score)
+            resume_score.append(similarity_score.flatten())  # Flatten simplifies complex arrays
             
-        similarity_matrix.append(resume_score)
+        if resume_score:  # Ensure we only append non-empty score arrays
+            similarity_matrix.append(resume_score)
             
-    similarity_matrix = np.array(similarity_matrix)
-    total_sum = np.sum(similarity_matrix)
-    length = similarity_matrix.size
-    result = total_sum / length
+    # Normalize and print final similarity score
+    if similarity_matrix:
+        similarity_matrix = np.array(similarity_matrix)
+        total_sum = np.nansum(similarity_matrix)  # Use nansum to handle NaN values
+        length = np.count_nonzero(~np.isnan(similarity_matrix))  # Only count valid entries
+        if length > 0:
+            result = total_sum / length
+        else:
+            result = np.nan  # Set result to NaN if no valid entries
+    else:
+        result = np.nan  # Handle case where similarity matrix is empty
 
-    print(f"\nFinal Normalized Similarity Score: {result:.6f}")
+    if not np.isnan(result):
+        print(f"\nFinal Normalized Similarity Score: {result:.6f}")
+    else:
+        print("\nNo valid similarity score could be calculated.")
 
 if __name__ == "__main__":
     main()

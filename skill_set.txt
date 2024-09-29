@@ -1,0 +1,54 @@
+
+Programming Languages:
+Python
+JavaScript
+Java
+C
+C++
+C#
+PHP
+TypeScript
+
+Tools:
+Jenkins
+Docker
+Kubernetes
+Ansible
+Terraform
+Git
+GitLab
+Bitbucket
+Maven
+Gradle
+Postman
+
+Cloud Technologies:
+Amazon Web Services (AWS)
+Microsoft Azure
+Google Cloud Platform (GCP)
+IBM Cloud
+Oracle Cloud
+Heroku
+Salesforce
+Firebase
+AWS Lambda
+Google Cloud Functions
+
+Databases:
+MySQL
+PostgreSQL
+MongoDB
+SQLite
+Oracle Database
+Redis
+
+Data Analytics Tools:
+Tableau
+Power BI
+Apache Spark
+Hadoop
+Google Data Studio
+Seaborn
+Jupyter Notebooks
+Pandas
+NumPy
