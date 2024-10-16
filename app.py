@@ -96,7 +96,6 @@ def main():
     
     for resume in resumes:
         resume_keywords = extract_keywords(resume)
-        # print("\nExtracted Resume Keywords:", resume_keywords)
         
         # Generate embeddings for resume keywords
         resume_embedding = generate_bert_embeddings(resume_keywords)        
